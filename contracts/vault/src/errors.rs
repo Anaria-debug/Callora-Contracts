@@ -48,6 +48,7 @@ use soroban_sdk::contracterror;
 /// | 44   | CallerNotInAllowlist           | Caller not in allowlist and not owner                    |
 /// | 49   | AdminCooldownActive            | Critical admin cool-off window is still active           |
 /// | 50   | InvalidAdminCooldown           | Admin cool-off window is outside accepted bounds         |
+/// | 56   | CannotWithdrawToVault          | Withdrawal recipient cannot be the vault address         |
 #[contracterror]
 #[repr(u32)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -149,4 +150,6 @@ pub enum VaultError {
     InvalidTimelockWindow = 54,
     /// Amount is below the minimum transfer unit (code 55).
     BelowMinTransferAmount = 55,
+    /// Withdrawal recipient cannot be the vault contract address (code 56).
+    CannotWithdrawToVault = 56,
 }
