@@ -113,6 +113,14 @@ must not be reassigned once released.
 | 40 | `InvalidVault` | Settlement | Vault address is invalid |
 | 41 | `NoVaultRotationPending` | Settlement | No vault rotation is pending |
 | 42 | `BroadcastMessageTooLong` | Settlement | Admin broadcast message exceeds the maximum length |
+| 43 | `CrossTenantBatch` | Settlement | Batch settlement mixed multiple developers |
+| 44 | `NoUpgradePending` | Settlement | No upgrade proposal is currently pending |
+| 45 | `ZeroWasmHash` | Settlement | Proposed WASM hash is all-zero (rejected) |
+| 46 | `UpgradeTimelockNotExpired` | Settlement | Upgrade timelock delay has not yet elapsed |
+| 47 | `UnsupportedToken` | Settlement | Token is not enabled for settlement payments |
+| 48 | `DuplicateRequestId` | Settlement | Deduction request ID has already been recorded |
+| 49 | `LengthMismatch` | Settlement | Paired batch vectors have different lengths |
+| 50 | `InvalidCursor` | Settlement | Batch cursor is past the end or the limit is zero |
 
 ## Revenue Pool
 
@@ -161,3 +169,5 @@ must not be reassigned once released.
 | 11 | `Overflow` | Upgrade | Arithmetic calculation overflowed |
 | 12 | `AlreadyUpgraded` | Upgrade | Contract has already been upgraded to this state |
 | 13 | `StaleNonce` | Upgrade | Transaction nonce is stale
+| 14 | `MigrationSameAddress` | Upgrade | Target migration contract address matches source |
+| 15 | `InvalidMigration
