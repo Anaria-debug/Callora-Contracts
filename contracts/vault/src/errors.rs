@@ -17,7 +17,7 @@ use soroban_sdk::contracterror;
 /// | 7    | ExceedsMaxDeduct               | Deduct amount exceeds the configured cap                 |
 /// | 8    | BelowMinDeposit                | Deposit amount is below the configured minimum           |
 /// | 9    | Overflow                       | Arithmetic overflow was detected                         |
-/// | 10   | InitialBalanceNegative         | Initial balance must be non-negative                     |
+/// | 10   | —                              | Reserved; freed to keep the enum within the 50-variant cap |
 /// | 11   | MinDepositNotPositive          | Minimum deposit must be greater than zero                |
 /// | 12   | MaxDeductNotPositive           | Maximum deduct must be greater than zero                 |
 /// | 13   | MinDepositExceedsMaxDeduct     | Minimum deposit cannot exceed maximum deduct             |
@@ -25,8 +25,8 @@ use soroban_sdk::contracterror;
 /// | 15   | RevenuePoolCannotBeVault       | Revenue pool address cannot be the vault contract        |
 /// | 16   | AuthorizedCallerCannotBeVault  | Authorized caller cannot be the vault contract           |
 /// | 17   | InitialBalanceExceedsOnLedger  | Initial tracked balance exceeds on-ledger USDC           |
-/// | 18   | AlreadyPaused                  | Contract is already paused                               |
-/// | 19   | NotPaused                      | Contract is not paused                                   |
+/// | 18   | CannotWithdrawToVault          | Withdrawal recipient is the vault contract itself        |
+/// | 19   | CannotWithdrawToToken          | Withdrawal recipient is the USDC token contract          |
 /// | 20   | SettlementNotSet               | Settlement address has not been configured               |
 /// | 21   | BatchEmpty                     | Batch deduct received no items                           |
 /// | 22   | BatchTooLarge                  | Batch deduct exceeds the maximum allowed size            |
@@ -44,11 +44,11 @@ use soroban_sdk::contracterror;
 /// | 34   | NoRevenuePoolTransferPending   | No revenue-pool transfer is pending                      |
 /// | 35   | Slippage                       | Fee basis points exceeds caller limit                    |
 /// | 36   | RateLimited                    | Developer rate limit has been exceeded                   |
-/// | 37   | PausedState                    | Operation is rejected because the vault is paused        |
+/// | 37   | ZeroAddressRecipient           | Withdrawal recipient is the zero address                 |
 /// | 44   | CallerNotInAllowlist           | Caller not in allowlist and not owner                    |
 /// | 49   | AdminCooldownActive            | Critical admin cool-off window is still active           |
 /// | 50   | InvalidAdminCooldown           | Admin cool-off window is outside accepted bounds         |
-/// | 56   | CannotWithdrawToVault          | Withdrawal recipient cannot be the vault address         |
+/// | 56   | SettlementCannotBeVault        | Settlement address cannot be the vault contract          |
 /// | 57   | SettlementCannotBeToken        | Settlement address cannot be the USDC token contract     |
 /// | 58   | ProposalExpired                | Proposal has passed its grace period and is expired      |
 /// | 51   | ProposalNotFound               | No pending timelock proposal for the requested action    |
@@ -93,10 +93,10 @@ pub enum VaultError {
     AuthorizedCallerCannotBeVault = 16,
     /// Initial balance exceeds on-ledger USDC balance (code 17).
     InitialBalanceExceedsOnLedger = 17,
-    /// Vault is already paused (code 18).
-    AlreadyPaused = 18,
-    /// Vault is not paused (code 19).
-    NotPaused = 19,
+    /// Withdrawal recipient cannot be the vault contract address (code 18).
+    CannotWithdrawToVault = 18,
+    /// Withdrawal recipient cannot be the USDC token contract address (code 19).
+    CannotWithdrawToToken = 19,
     /// Settlement address has not been configured (code 20).
     SettlementNotSet = 20,
     /// Batch deduct requires at least one item (code 21).
@@ -127,8 +127,8 @@ pub enum VaultError {
     Slippage = 35,
     /// Rate limit exceeded for the developer (code 36).
     RateLimited = 36,
-    /// Operation is rejected because the vault is paused (code 37).
-    PausedState = 37,
+    /// Withdrawal recipient cannot be the zero address (code 37).
+    ZeroAddressRecipient = 37,
     /// Hot BPS must be between 1 and 10000 (code 38).
     InvalidHotBps = 38,
     /// Rebalance threshold must be between 1 and 10000 (code 39).
@@ -157,8 +157,8 @@ pub enum VaultError {
     InvalidTimelockWindow = 54,
     /// Amount is below the minimum transfer unit (code 55).
     BelowMinTransferAmount = 55,
-/// Withdrawal recipient cannot be the vault contract address (code 56).
-    CannotWithdrawToVault = 56,
+    /// Settlement address cannot be the vault contract itself (code 56).
+    SettlementCannotBeVault = 56,
     /// Settlement address cannot be the USDC token contract (code 57).
     SettlementCannotBeToken = 57,
     /// Proposal has passed its grace period and is no longer executable (code 58).

@@ -1,8 +1,8 @@
 //! Frozen snapshot of `VaultError` discriminant codes (buffer #4).
-///
-/// These tests guard against accidental renumbering of error codes, which would
-/// silently break off-chain integrators that branch on numeric error codes
-/// returned by the contract.
+//!
+//! These tests guard against accidental renumbering of error codes, which would
+//! silently break off-chain integrators that branch on numeric error codes
+//! returned by the contract.
 
 extern crate std;
 
@@ -32,8 +32,8 @@ const FROZEN_ERROR_SNAPSHOT: [(u32, VaultError); 49] = [
     (15, VaultError::RevenuePoolCannotBeVault),
     (16, VaultError::AuthorizedCallerCannotBeVault),
     (17, VaultError::InitialBalanceExceedsOnLedger),
-    (18, VaultError::AlreadyPaused),
-    (19, VaultError::NotPaused),
+    (18, VaultError::CannotWithdrawToVault),
+    (19, VaultError::CannotWithdrawToToken),
     (20, VaultError::SettlementNotSet),
     (21, VaultError::BatchEmpty),
     (22, VaultError::BatchTooLarge),
@@ -49,7 +49,7 @@ const FROZEN_ERROR_SNAPSHOT: [(u32, VaultError); 49] = [
     (34, VaultError::NoRevenuePoolTransferPending),
     (35, VaultError::Slippage),
     (36, VaultError::RateLimited),
-    (37, VaultError::PausedState),
+    (37, VaultError::ZeroAddressRecipient),
     (38, VaultError::InvalidHotBps),
     (39, VaultError::InvalidRebalanceThreshold),
     (40, VaultError::ColdSignersEmpty),
@@ -192,16 +192,16 @@ fn test_initial_balance_exceeds_on_ledger_is_code_17() {
     assert_eq!(VaultError::InitialBalanceExceedsOnLedger as u32, 17);
 }
 
-/// Verify `AlreadyPaused` still has discriminant 18.
+/// Verify `CannotWithdrawToVault` still has discriminant 18.
 #[test]
-fn test_already_paused_is_code_18() {
-    assert_eq!(VaultError::AlreadyPaused as u32, 18);
+fn test_cannot_withdraw_to_vault_is_code_18() {
+    assert_eq!(VaultError::CannotWithdrawToVault as u32, 18);
 }
 
-/// Verify `NotPaused` still has discriminant 19.
+/// Verify `CannotWithdrawToToken` still has discriminant 19.
 #[test]
-fn test_not_paused_is_code_19() {
-    assert_eq!(VaultError::NotPaused as u32, 19);
+fn test_cannot_withdraw_to_token_is_code_19() {
+    assert_eq!(VaultError::CannotWithdrawToToken as u32, 19);
 }
 
 /// Verify `SettlementNotSet` still has discriminant 20.
@@ -282,10 +282,10 @@ fn test_rate_limited_is_code_36() {
     assert_eq!(VaultError::RateLimited as u32, 36);
 }
 
-/// Verify `PausedState` still has discriminant 37.
+/// Verify `ZeroAddressRecipient` still has discriminant 37.
 #[test]
-fn test_paused_state_is_code_37() {
-    assert_eq!(VaultError::PausedState as u32, 37);
+fn test_zero_address_recipient_is_code_37() {
+    assert_eq!(VaultError::ZeroAddressRecipient as u32, 37);
 }
 
 /// Verify `InvalidHotBps` still has discriminant 38.

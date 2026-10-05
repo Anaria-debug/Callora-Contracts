@@ -90,16 +90,47 @@ fn setup_simulate_vault<'a>(
 // Proptest: simulate_deduct and try_deduct return the same error code
 // ---------------------------------------------------------------------------
 
+/// Normalises the error side of an SDK `try_*` result to a numeric code.
+///
+/// Both entrypoints declare `Result<_, VaultError>`, so the generated client
+/// wraps the outcome in an additional `Result` whose error may be a typed
+/// `VaultError`, a host `Error`, or a value-conversion error. This trait keeps
+/// the helper below generic over those three shapes.
+trait ContractErrorCode {
+    fn contract_error_code(&self) -> Option<u32>;
+}
+
+impl ContractErrorCode for VaultError {
+    fn contract_error_code(&self) -> Option<u32> {
+        Some(*self as u32)
+    }
+}
+
+impl ContractErrorCode for soroban_sdk::Error {
+    fn contract_error_code(&self) -> Option<u32> {
+        Some(self.get_code())
+    }
+}
+
+impl ContractErrorCode for soroban_sdk::ConversionError {
+    fn contract_error_code(&self) -> Option<u32> {
+        None
+    }
+}
+
 /// Helper to extract the `VaultError` discriminant from a `try_*` result.
 ///
-/// Returns `Some(code)` when the call returned a `VaultError`, or `None` when
+/// Returns `Some(code)` when the call returned a contract error, or `None` when
 /// the call succeeded.
-fn err_code_from<V>(
-    result: Result<Result<V, soroban_sdk::Error>, Result<soroban_sdk::Error, soroban_sdk::InvokeError>>,
-) -> Option<u32> {
+fn err_code_from<V, E>(
+    result: Result<Result<V, E>, Result<VaultError, soroban_sdk::InvokeError>>,
+) -> Option<u32>
+where
+    E: ContractErrorCode,
+{
     match result {
-        Err(Ok(e)) => Some(e.get_code()),
-        Ok(Err(e)) => Some(e.get_code()),
+        Err(Ok(e)) => e.contract_error_code(),
+        Ok(Err(e)) => e.contract_error_code(),
         Ok(Ok(_)) => None,
         Err(Err(_)) => None,
     }
@@ -156,7 +187,11 @@ proptest! {
         prop_assert_eq!(
             sim_code, deduct_code,
             "simulate_deduct and deduct returned different outcomes for \
-             amount={amount} use_auth={use_auth_caller} paused={paused} balance={balance}"
+             amount={} use_auth={} paused={} balance={}",
+            amount,
+            use_auth_caller,
+            paused,
+            balance
         );
     }
 }

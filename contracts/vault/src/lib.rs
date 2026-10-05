@@ -72,6 +72,12 @@ pub use callora_validators as validators;
 mod errors;
 pub use errors::VaultError;
 
+/// StrKey of the "zero" contract address (all thirty-two bytes are zero).
+///
+/// `withdraw_to` rejects this recipient so a zeroed/mistyped address cannot
+/// silently burn funds. Mirrors the guard used by the fee contract.
+const ZERO_CONTRACT_ADDRESS: &str = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4";
+
 /// A single item in a batch deduction.
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
@@ -216,6 +222,11 @@ impl CalloraVault {
         Ok(())
     }
 
+    /// Return `true` when `recipient` is the zero contract address.
+    fn is_zero_recipient(env: &Env, recipient: &Address) -> bool {
+        recipient == &Address::from_str(env, ZERO_CONTRACT_ADDRESS)
+    }
+
     fn require_valid_deposit_amount(amount: i128, min_deposit: i128) -> Result<(), VaultError> {
         Self::require_positive_amount(amount)?;
         if amount < min_deposit {
@@ -342,7 +353,7 @@ impl CalloraVault {
 
         let initial_balance_val = initial_balance.unwrap_or(0);
         if initial_balance_val < 0 {
-            return Err(VaultError::InitialBalanceNegative);
+            return Err(VaultError::AmountNotPositive);
         }
 
         env.storage().instance().set(&DataKey::Owner, &owner);
@@ -1016,23 +1027,30 @@ impl CalloraVault {
     /// - `amount` — USDC stroops to withdraw; must be > 0.
     ///
     /// # Returns
-    /// The new vault balance after the withdrawal.
+    /// `Ok(new_balance)` — the vault balance after the withdrawal.
     ///
-    /// # Panics
-    /// - `"amount must be positive"` — `amount <= 0`.
-    /// - `"insufficient balance"` — vault balance < `amount`.
-    pub fn withdraw(env: Env, amount: i128) -> i128 {
-        let owner = Self::get_owner(env.clone());
+    /// # Errors
+    /// - [`VaultError::NotInitialized`] — the vault has not been initialized.
+    /// - [`VaultError::AmountNotPositive`] — `amount <= 0`.
+    /// - [`VaultError::InsufficientBalance`] — vault balance < `amount`.
+    /// - [`VaultError::Overflow`] — the balance subtraction overflowed.
+    pub fn withdraw(env: Env, amount: i128) -> Result<i128, VaultError> {
+        Self::bump_instance_ttl(&env);
+        let owner: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Owner)
+            .ok_or(VaultError::NotInitialized)?;
         owner.require_auth();
-        Self::require_positive_amount(amount).unwrap();
+        Self::require_positive_amount(amount)?;
 
         let current_bal: i128 = env.storage().instance().get(&DataKey::Balance).unwrap_or(0);
 
         if current_bal < amount {
-            panic!("insufficient balance");
+            return Err(VaultError::InsufficientBalance);
         }
 
-        let new_bal = current_bal.checked_sub(amount).unwrap();
+        let new_bal = current_bal.checked_sub(amount).ok_or(VaultError::Overflow)?;
         env.storage().instance().set(&DataKey::Balance, &new_bal);
         Self::bump_instance(&env);
 
@@ -1040,7 +1058,7 @@ impl CalloraVault {
             .storage()
             .instance()
             .get(&DataKey::UsdcToken)
-            .expect("vault not initialized");
+            .ok_or(VaultError::NotInitialized)?;
 
         token::Client::new(&env, &usdc_addr).transfer(
             &env.current_contract_address(),
@@ -1057,7 +1075,7 @@ impl CalloraVault {
             (amount, new_bal),
         );
 
-        new_bal
+        Ok(new_bal)
     }
 
     /// Withdraw USDC from the vault to an arbitrary recipient address (owner only).
@@ -1077,39 +1095,52 @@ impl CalloraVault {
     /// - `amount` — USDC stroops to withdraw; must be > 0.
     ///
     /// # Returns
-    /// The new vault balance after the withdrawal.
+    /// `Ok(new_balance)` — the vault balance after the withdrawal.
     ///
-    /// # Panics
-    /// - `"amount must be positive"` — `amount <= 0`.
-    /// - `"insufficient balance"` — vault balance < `amount`.
-    /// - `"cannot withdraw to vault address"` — `to == vault_address`.
-    /// - `"cannot withdraw to token address"` — `to == usdc_token`.
-    pub fn withdraw_to(env: Env, to: Address, amount: i128) -> i128 {
-        let owner = Self::get_owner(env.clone());
+    /// # Errors
+    /// - [`VaultError::NotInitialized`] — the vault has not been initialized.
+    /// - [`VaultError::ZeroAddressRecipient`] — `to` is the zero address.
+    /// - [`VaultError::CannotWithdrawToVault`] — `to` is the vault contract.
+    /// - [`VaultError::CannotWithdrawToToken`] — `to` is the USDC token contract.
+    /// - [`VaultError::AmountNotPositive`] — `amount <= 0`.
+    /// - [`VaultError::InsufficientBalance`] — vault balance < `amount`.
+    /// - [`VaultError::Overflow`] — the balance subtraction overflowed.
+    pub fn withdraw_to(env: Env, to: Address, amount: i128) -> Result<i128, VaultError> {
+        Self::bump_instance_ttl(&env);
+        let owner: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Owner)
+            .ok_or(VaultError::NotInitialized)?;
         owner.require_auth();
-        Self::require_positive_amount(amount).unwrap();
-
-        // Recipient validation
-        assert!(
-            to != env.current_contract_address(),
-            "cannot withdraw to vault address"
-        );
 
         let usdc_addr: Address = env
             .storage()
             .instance()
             .get(&DataKey::UsdcToken)
-            .expect("vault not initialized");
+            .ok_or(VaultError::NotInitialized)?;
 
-        assert!(to != usdc_addr, "cannot withdraw to token address");
+        // Recipient validation runs before the amount check so a mistyped
+        // recipient is reported as such instead of as a bad amount.
+        if Self::is_zero_recipient(&env, &to) {
+            return Err(VaultError::ZeroAddressRecipient);
+        }
+        if to == env.current_contract_address() {
+            return Err(VaultError::CannotWithdrawToVault);
+        }
+        if to == usdc_addr {
+            return Err(VaultError::CannotWithdrawToToken);
+        }
+
+        Self::require_positive_amount(amount)?;
 
         let current_bal: i128 = env.storage().instance().get(&DataKey::Balance).unwrap_or(0);
 
         if current_bal < amount {
-            panic!("insufficient balance");
+            return Err(VaultError::InsufficientBalance);
         }
 
-        let new_bal = current_bal.checked_sub(amount).unwrap();
+        let new_bal = current_bal.checked_sub(amount).ok_or(VaultError::Overflow)?;
         env.storage().instance().set(&DataKey::Balance, &new_bal);
         Self::bump_instance(&env);
 
@@ -1129,7 +1160,7 @@ impl CalloraVault {
             (amount, new_bal),
         );
 
-        new_bal
+        Ok(new_bal)
     }
 
     /// Admin distribute USDC surplus to a recipient (admin only).
@@ -1143,28 +1174,31 @@ impl CalloraVault {
     /// - `to` — recipient address.
     /// - `amount` — USDC stroops to distribute; must be > 0.
     ///
-    /// # Panics
-    /// - `"amount must be positive"` — `amount <= 0`.
-    /// - `"insufficient USDC balance"` — on-ledger balance < `amount`.
-    pub fn distribute(env: Env, caller: Address, to: Address, amount: i128) {
-        Self::require_admin(&env, &caller).unwrap();
-        Self::require_positive_amount(amount).unwrap();
-
-        if amount <= 0 {
-            panic!("amount must be positive");
-        }
+    /// # Errors
+    /// - [`VaultError::NotInitialized`] — the vault has not been initialized.
+    /// - [`VaultError::Unauthorized`] — `caller` is not the current admin.
+    /// - [`VaultError::AmountNotPositive`] — `amount <= 0`.
+    /// - [`VaultError::InsufficientBalance`] — on-ledger balance < `amount`.
+    pub fn distribute(
+        env: Env,
+        caller: Address,
+        to: Address,
+        amount: i128,
+    ) -> Result<(), VaultError> {
+        Self::require_admin(&env, &caller)?;
+        Self::require_positive_amount(amount)?;
 
         let usdc_addr: Address = env
             .storage()
             .instance()
             .get(&DataKey::UsdcToken)
-            .expect("USDC Token not set");
+            .ok_or(VaultError::NotInitialized)?;
 
         let usdc = token::Client::new(&env, &usdc_addr);
         let on_ledger = usdc.balance(&env.current_contract_address());
 
         if on_ledger < amount {
-            panic!("insufficient USDC balance");
+            return Err(VaultError::InsufficientBalance);
         }
 
         usdc.transfer(&env.current_contract_address(), &to, &amount);
@@ -1177,6 +1211,8 @@ impl CalloraVault {
             ),
             amount,
         );
+
+        Ok(())
     }
 
     /// Return `true` if the vault is currently paused, `false` otherwise.
@@ -2913,11 +2949,16 @@ mod test_simulate_parity;
 #[cfg(test)]
 mod test_views;
 
+
 #[cfg(test)]
 mod test_reentrancy;
 
 #[cfg(test)]
 mod test;
+
+/// Recipient-validation coverage for `withdraw_to`'s zero-address guard.
+#[cfg(test)]
+mod test_withdraw_to_zero_address;
 
 // #[cfg(test)]
 // mod test_gas_budget;

@@ -1,13 +1,12 @@
 //! Focused tests for withdraw_to zero-address recipient validation.
 //!
 //! Verifies that `withdraw_to` rejects zero-address recipients with
-//! `VaultError::ZeroAddressRecipient` (error code 37) and returns
-//! `Result<i128, VaultError>` from the withdraw entrypoints.
+//! `VaultError::ZeroAddressRecipient` (error code 37).
 
 extern crate std;
 
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{token, Address, BytesN, Env};
+use soroban_sdk::{token, Address, Env};
 
 use super::*;
 
@@ -40,10 +39,9 @@ fn fund_vault(
     usdc_admin_client.mint(vault_address, &amount);
 }
 
-/// Create a zero address (contract address with all zero bytes).
+/// Create the zero address (all-zero contract id, StrKey form).
 fn zero_address(env: &Env) -> Address {
-    let zero_bytes = BytesN::<32>::from_array(env, &[0u8; 32]);
-    Address::from_contract_id(&zero_bytes)
+    Address::from_str(env, ZERO_CONTRACT_ADDRESS)
 }
 
 // ---------------------------------------------------------------------------
@@ -60,10 +58,19 @@ fn withdraw_to_zero_address_fails() {
 
     env.mock_all_auths();
     fund_vault(&usdc_admin, &vault_address, 1000);
-    client.init(&owner, &usdc, &Some(1000), &None, &None, &None, &None);
+    client.init(
+        &owner,
+        &usdc,
+        &Some(1000),
+        &None,
+        &Some(1i128),
+        &None,
+        &None,
+        &None,
+    );
 
     let zero_addr = zero_address(&env);
-    let result: Result<Result<i128, VaultError>, _> = client.try_withdraw_to(&zero_addr, &100);
+    let result = client.try_withdraw_to(&zero_addr, &100);
 
     assert!(result.is_err(), "expected error for zero-address recipient");
     // Verify the specific error code (37 = ZeroAddressRecipient)
@@ -87,9 +94,18 @@ fn withdraw_to_valid_address_succeeds() {
 
     env.mock_all_auths();
     fund_vault(&usdc_admin, &vault_address, 1000);
-    client.init(&owner, &usdc, &Some(1000), &None, &None, &None, &None);
+    client.init(
+        &owner,
+        &usdc,
+        &Some(1000),
+        &None,
+        &Some(1i128),
+        &None,
+        &None,
+        &None,
+    );
 
-    let remaining = client.withdraw_to(&recipient, &100).unwrap();
+    let remaining = client.withdraw_to(&recipient, &100);
 
     assert_eq!(remaining, 900);
     assert_eq!(client.balance(), 900);
@@ -106,11 +122,20 @@ fn withdraw_to_zero_address_checked_before_amount() {
 
     env.mock_all_auths();
     fund_vault(&usdc_admin, &vault_address, 1000);
-    client.init(&owner, &usdc, &Some(1000), &None, &None, &None, &None);
+    client.init(
+        &owner,
+        &usdc,
+        &Some(1000),
+        &None,
+        &Some(1i128),
+        &None,
+        &None,
+        &None,
+    );
 
     // Even with an invalid amount (0), zero-address should be rejected first
     let zero_addr = zero_address(&env);
-    let result: Result<Result<i128, VaultError>, _> = client.try_withdraw_to(&zero_addr, &0);
+    let result = client.try_withdraw_to(&zero_addr, &0);
 
     assert!(result.is_err(), "expected error for zero-address recipient");
     let err = result.unwrap_err();
@@ -135,14 +160,23 @@ fn withdraw_to_zero_address_fails_even_when_paused() {
 
     env.mock_all_auths();
     fund_vault(&usdc_admin, &vault_address, 1000);
-    client.init(&owner, &usdc, &Some(1000), &None, &None, &None, &None);
+    client.init(
+        &owner,
+        &usdc,
+        &Some(1000),
+        &None,
+        &Some(1i128),
+        &None,
+        &None,
+        &None,
+    );
 
     // Pause the vault
     client.pause(&owner);
     assert!(client.is_paused());
 
     let zero_addr = zero_address(&env);
-    let result: Result<Result<i128, VaultError>, _> = client.try_withdraw_to(&zero_addr, &100);
+    let result = client.try_withdraw_to(&zero_addr, &100);
 
     assert!(result.is_err(), "expected error for zero-address recipient even when paused");
     let err = result.unwrap_err();
@@ -165,18 +199,27 @@ fn withdraw_to_valid_after_zero_address_rejection() {
 
     env.mock_all_auths();
     fund_vault(&usdc_admin, &vault_address, 1000);
-    client.init(&owner, &usdc, &Some(1000), &None, &None, &None, &None);
+    client.init(
+        &owner,
+        &usdc,
+        &Some(1000),
+        &None,
+        &Some(1i128),
+        &None,
+        &None,
+        &None,
+    );
 
     // First, try zero address (should fail)
     let zero_addr = zero_address(&env);
-    let result: Result<Result<i128, VaultError>, _> = client.try_withdraw_to(&zero_addr, &100);
+    let result = client.try_withdraw_to(&zero_addr, &100);
     assert!(result.is_err());
 
     // Balance should be unchanged
     assert_eq!(client.balance(), 1000);
 
     // Now try valid recipient (should succeed)
-    let remaining = client.withdraw_to(&recipient, &100).unwrap();
+    let remaining = client.withdraw_to(&recipient, &100);
     assert_eq!(remaining, 900);
     assert_eq!(usdc_client.balance(&recipient), 100);
 }

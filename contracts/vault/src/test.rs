@@ -996,7 +996,7 @@ fn withdraw_to_insufficient_balance_fails() {
 }
 
 #[test]
-#[should_panic(expected = "cannot withdraw to vault address")]
+#[should_panic(expected = "Error(Contract, #18)")]
 fn withdraw_to_vault_address_fails() {
     let env = Env::default();
     let owner = Address::generate(&env);
@@ -1021,7 +1021,7 @@ fn withdraw_to_vault_address_fails() {
 }
 
 #[test]
-#[should_panic(expected = "cannot withdraw to token address")]
+#[should_panic(expected = "Error(Contract, #19)")]
 fn withdraw_to_token_address_fails() {
     let env = Env::default();
     let owner = Address::generate(&env);
@@ -1416,7 +1416,7 @@ fn init_with_revenue_pool_stores_address() {
 }
 
 #[test]
-#[should_panic(expected = "Settlement not set")]
+#[should_panic(expected = "Error(Contract, #20)")]
 fn deduct_with_only_revenue_pool_panics() {
     // Revenue pool is no longer a deduct destination; settlement is mandatory.
     let env = Env::default();
@@ -2073,7 +2073,7 @@ fn deduct_exceeds_max_deduct_fails() {
 }
 
 #[test]
-#[should_panic(expected = "AmountNotPositive")]
+#[should_panic(expected = "Error(Contract, #6)")]
 fn distribute_negative_amount_fails() {
     let env = Env::default();
     let owner = Address::generate(&env);
@@ -2117,7 +2117,7 @@ fn accept_admin_without_pending_fails() {
 }
 
 #[test]
-#[should_panic(expected = "no ownership transfer pending")]
+#[should_panic(expected = "Error(Contract, #24)")]
 fn accept_ownership_without_pending_fails() {
     let env = Env::default();
     let owner = Address::generate(&env);
@@ -2142,7 +2142,7 @@ fn accept_ownership_without_pending_fails() {
 // ---------------------------------------------------------------------------
 
 #[test]
-#[should_panic(expected = "AmountNotPositive")]
+#[should_panic(expected = "Error(Contract, #6)")]
 fn withdraw_negative_fails() {
     let env = Env::default();
     let owner = Address::generate(&env);
@@ -2164,7 +2164,7 @@ fn withdraw_negative_fails() {
 }
 
 #[test]
-#[should_panic(expected = "AmountNotPositive")]
+#[should_panic(expected = "Error(Contract, #6)")]
 fn withdraw_to_negative_fails() {
     let env = Env::default();
     let owner = Address::generate(&env);
@@ -2187,7 +2187,7 @@ fn withdraw_to_negative_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Settlement not set")]
+#[should_panic(expected = "Error(Contract, #20)")]
 fn deduct_without_settlement_panics() {
     // Settlement is a hard precondition for deduct; missing address must panic.
     let env = Env::default();
